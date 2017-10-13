@@ -3,6 +3,7 @@ package com.idirenzo.mobiledev.jedisimulator;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.drawable.Drawable;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -25,30 +26,18 @@ import java.util.Random;
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
     // Constants
     private static final float SWING_THRESHOLD = 14f;
-    private static final float HIT_THREASHOLD = 26f;
+    private static final float HIT_THRESHOLD = 26f;
 
     private static final int RAND_MAX = 100;
     private static final int WILHELM_CHANCE = 5;
 
     private static final int SENSOR_DELAY = SensorManager.SENSOR_DELAY_FASTEST;
 
-    private static final float PULSE_VOLUME = 0.7f;
-    private static final float ON_OFF_VOLUME = 1.0f;
-    private static final float SWING_HIT_VOLUME = 0.75f;
-    private static final float WILHELM_VOLUME = 1.0f;
-
     // Saber colours
-    private List<String> saberColours = new ArrayList<>();
-    private String currentSaberColour;
-
-    // Sound IDs
-    private SoundPool soundPool;
-    private MediaPlayer saberPulse;
-    private int sidLightSaberOn;
-    private int sidLightSaberOff;
-    private int sidWilhelm;
-    private int[] sidLightSaberSwing = new int[4];
-    private int[] sidLightSaberHit = new int[4];
+    private static final int SABER_COLOUR_BLUE = 0;
+    private static final int SABER_COLOUR_GREEN = 1;
+    private static final int SABER_COLOUR_RED = 2;
+    private int currentSaberColour;
 
     // Sensor stuff
     private SensorManager sensorManager;
@@ -56,6 +45,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private float acceleration;
     private float lastAcceleration;
     private float currentAcceleration;
+
+    // Sounds
+    private SoundEngine soundEngine;
 
     // UI controls
     private Button buttonSaber;
@@ -80,43 +72,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         lastAcceleration = SensorManager.GRAVITY_EARTH;
         currentAcceleration = SensorManager.GRAVITY_EARTH;
 
-        // Set up audio
-        saberPulse = MediaPlayer.create(this, R.raw.lightsaberpulse);
-        saberPulse.setVolume(PULSE_VOLUME, PULSE_VOLUME);
-        saberPulse.setLooping(true);
-
-        AudioAttributes audioAttributes = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_GAME)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build();
-
-        soundPool = new SoundPool.Builder()
-                .setMaxStreams(12)
-                .setAudioAttributes(audioAttributes)
-                .build();
-
-        sidLightSaberOn = soundPool.load(this, R.raw.ltsaberon01, 1);
-        sidLightSaberOff = soundPool.load(this, R.raw.ltsaberoff01, 1);
-        sidWilhelm = soundPool.load(this, R.raw.wilhelm, 1);
-
-        sidLightSaberSwing[0] = soundPool.load(this, R.raw.ltsaberswing01, 1);
-        sidLightSaberSwing[1] = soundPool.load(this, R.raw.ltsaberswing02, 1);
-        sidLightSaberSwing[2] = soundPool.load(this, R.raw.ltsaberswing03, 1);
-        sidLightSaberSwing[3] = soundPool.load(this, R.raw.ltsaberswing04, 1);
-
-        sidLightSaberHit[0] = soundPool.load(this, R.raw.ltsaberhit01, 1);
-        sidLightSaberHit[1] = soundPool.load(this, R.raw.ltsaberhit02, 1);
-        sidLightSaberHit[2] = soundPool.load(this, R.raw.ltsaberhit03, 1);
-        sidLightSaberHit[3] = soundPool.load(this, R.raw.ltsaberhit15, 1);
-
-        // Set up saber colours
-        saberColours.add("Red");
-        saberColours.add("Green");
-        saberColours.add("Blue");
+        // Set up sound
+        soundEngine = new SoundEngine(this);
 
         // Get the saved saber colour of default to Blue
         SharedPreferences preferences = getPreferences(Context.MODE_PRIVATE);
-        currentSaberColour = preferences.getString("SaberColour", "Blue");
+        currentSaberColour = preferences.getInt("SaberColour", SABER_COLOUR_BLUE);
 
         // UI
         buttonSaber = (Button)findViewById(R.id.buttonSaber);
@@ -145,7 +106,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onPause();
         sensorManager.unregisterListener(this);
         if (lightSaberOn) {
-            saberPulse.pause();
+            soundEngine.pauseSaberPulse();
         }
     }
 
@@ -154,7 +115,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onPostResume();
         sensorManager.registerListener(this, accelerometer, SENSOR_DELAY);
         if (lightSaberOn) {
-            saberPulse.start();
+            soundEngine.startSaberPulse();
         }
     }
 
@@ -171,17 +132,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         // Check for lightsaber swing
         if (lightSaberOn && acceleration > SWING_THRESHOLD) {
             // If the phone was swung hard enough, play a hit effect
-            if (acceleration > HIT_THREASHOLD) {
-                int soundId = rand.nextInt(sidLightSaberHit.length);
-                soundPool.play(sidLightSaberHit[soundId], SWING_HIT_VOLUME, SWING_HIT_VOLUME, 0, 0, 1);
+            if (acceleration > HIT_THRESHOLD) {
+                soundEngine.playSaberHit();
 
                 // What action scene can't be made better with a "Wilhelm Scream"?
                 if (rand.nextInt(RAND_MAX) < WILHELM_CHANCE) {
-                    soundPool.play(sidWilhelm, WILHELM_VOLUME, WILHELM_VOLUME, 1, 0, 1);
+                    soundEngine.playWilhelmScream();
                 }
             } else {    // Play a swing effect
-                int soundId = rand.nextInt(sidLightSaberSwing.length);
-                soundPool.play(sidLightSaberSwing[soundId], SWING_HIT_VOLUME, SWING_HIT_VOLUME, 0, 0, 1);
+                soundEngine.playSaberSwing();
             }
         }
     }
@@ -198,7 +157,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             case R.id.buttonSaveColour:
                 SharedPreferences preferences = getPreferences(Context.MODE_PRIVATE);
                 SharedPreferences.Editor editor = preferences.edit();
-                editor.putString("SaberColour", currentSaberColour);
+                editor.putInt("SaberColour", currentSaberColour);
                 editor.apply();
                 Toast.makeText(this, "Colour Saved", Toast.LENGTH_SHORT).show();
                 break;
@@ -207,38 +166,45 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     public void toggleLightSaber(View view) {
         if (!lightSaberOn) {
-            soundPool.play(sidLightSaberOn, ON_OFF_VOLUME, ON_OFF_VOLUME, 0, 0, 1);
-            saberPulse.start();
+            soundEngine.playSaberOn();
+            soundEngine.startSaberPulse();
             lightSaberOn = true;
         } else {
-            soundPool.play(sidLightSaberOff, ON_OFF_VOLUME, ON_OFF_VOLUME, 0, 0, 1);
-            saberPulse.stop();
-            try {
-                saberPulse.prepare();
-            } catch (IOException e) {
-                e.printStackTrace();
-                Toast.makeText(this, "Error Re-Initializing Saber Pulse Sound", Toast.LENGTH_SHORT).show();
-            }
+            soundEngine.playSaberOff();
+            soundEngine.stopSaberPulse();
             lightSaberOn = false;
         }
         updateSaberImage();
     }
 
     public void cycleSaberColour(View view) {
-        int pos = saberColours.indexOf(currentSaberColour);
         if (view.getId() == R.id.buttonNextSaber) {
             // Next saber
-            if (pos + 1 >= saberColours.size()) {
-                currentSaberColour = saberColours.get(0);
-            } else {
-                currentSaberColour = saberColours.get(pos + 1);
+            switch (currentSaberColour) {
+                default:
+                case SABER_COLOUR_RED:
+                    currentSaberColour = SABER_COLOUR_GREEN;
+                    break;
+                case SABER_COLOUR_GREEN:
+                    currentSaberColour = SABER_COLOUR_BLUE;
+                    break;
+                case SABER_COLOUR_BLUE:
+                    currentSaberColour = SABER_COLOUR_RED;
+                    break;
             }
         } else {
             // Previous saber
-            if (pos - 1 < 0) {
-                currentSaberColour = saberColours.get(saberColours.size() - 1);
-            } else {
-                currentSaberColour = saberColours.get(pos - 1);
+            switch (currentSaberColour) {
+                default:
+                case SABER_COLOUR_RED:
+                    currentSaberColour = SABER_COLOUR_BLUE;
+                    break;
+                case SABER_COLOUR_GREEN:
+                    currentSaberColour = SABER_COLOUR_GREEN;
+                    break;
+                case SABER_COLOUR_BLUE:
+                    currentSaberColour = SABER_COLOUR_RED;
+                    break;
             }
         }
         updateSaberImage();
@@ -247,21 +213,21 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     // Helpers
     private void updateSaberImage() {
         switch (currentSaberColour) {
-            case "Red":
+            case SABER_COLOUR_RED:
                 if (lightSaberOn) {
                     buttonSaber.setBackground(getDrawable(R.drawable.lightsaber_red));
                 } else {
                     buttonSaber.setBackground(getDrawable(R.drawable.lightsaber_red_hilt));
                 }
                 break;
-            case "Green":
+            case SABER_COLOUR_GREEN:
                 if (lightSaberOn) {
                     buttonSaber.setBackground(getDrawable(R.drawable.lightsaber_green));
                 } else {
                     buttonSaber.setBackground(getDrawable(R.drawable.lightsaber_green_hilt));
                 }
                 break;
-            case "Blue":
+            case SABER_COLOUR_BLUE:
                 if (lightSaberOn) {
                     buttonSaber.setBackground(getDrawable(R.drawable.lightsaber_blue));
                 } else {
