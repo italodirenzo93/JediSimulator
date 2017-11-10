@@ -76,8 +76,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         soundEngine = new SoundEngine(this);
 
         // Get the saved saber colour of default to Blue
-        SharedPreferences preferences = getPreferences(Context.MODE_PRIVATE);
-        currentSaberColour = preferences.getInt("SaberColour", SABER_COLOUR_BLUE);
+        try {
+            SharedPreferences preferences = getPreferences(Context.MODE_PRIVATE);
+            currentSaberColour = preferences.getInt("SaberColour", SABER_COLOUR_BLUE);
+        }
+        catch (Exception ex) {
+            Toast.makeText(this, "Unable to read saved colour.", Toast.LENGTH_SHORT).show();
+        }
 
         // UI
         buttonSaber = (Button)findViewById(R.id.buttonSaber);
@@ -200,10 +205,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     currentSaberColour = SABER_COLOUR_BLUE;
                     break;
                 case SABER_COLOUR_GREEN:
-                    currentSaberColour = SABER_COLOUR_GREEN;
+                    currentSaberColour = SABER_COLOUR_RED;
                     break;
                 case SABER_COLOUR_BLUE:
-                    currentSaberColour = SABER_COLOUR_RED;
+                    currentSaberColour = SABER_COLOUR_GREEN;
                     break;
             }
         }
